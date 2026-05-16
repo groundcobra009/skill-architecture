@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Skill Architecture & Flows</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Helvetica,sans-serif;background:#fff;color:#1e293b;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body.is-dragging{cursor:grabbing !important;user-select:none}
+body.is-dragging *{cursor:grabbing !important}
+
+.tab-bar{background:#f8fafc;border-bottom:2px solid #e2e8f0;padding:0 24px;display:flex;align-items:flex-end;gap:4px;flex-shrink:0}
+.tab{padding:11px 18px 9px;font-size:13px;font-weight:600;color:#94a3b8;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;border-radius:6px 6px 0 0;display:flex;align-items:center;gap:6px}
+.tab:hover{color:#475569;background:#f1f5f9}
+.tab.active{color:#2563eb;border-bottom-color:#2563eb;background:#fff}
+
+header{background:#fff;border-bottom:1px solid #e2e8f0;padding:11px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0}
+header h1{font-size:15px;font-weight:700;color:#0f172a}
+header p{font-size:11px;color:#94a3b8}
+#hdr-name{outline:none;border-radius:3px;padding:1px 3px;cursor:text;display:inline}
+#hdr-name:hover{background:#f1f5f9}
+#hdr-name:focus{background:#eff6ff;box-shadow:0 0 0 2px #bfdbfe}
+.hint{margin-left:auto;font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 12px;border-radius:20px}
+
+.legend{display:flex;gap:18px;padding:7px 24px;background:#f8fafc;border-bottom:1px solid #e2e8f0;flex-shrink:0;flex-wrap:wrap;align-items:center}
+.lg{display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b}
+.lg-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+
+.workspace{display:flex;flex:1;overflow:hidden}
+
+/* ── グラフエリア ── */
+.graph-wrap{flex:1;overflow:auto;background:#f8fafc;position:relative}
+
+.graph-toolbar{position:sticky;top:0;left:0;z-index:50;background:rgba(248,250,252,.95);backdrop-filter:blur(6px);border-bottom:1px solid #e2e8f0;padding:8px 20px;display:flex;align-items:center;gap:8px}
+.toolbar-label{font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;margin-right:4px}
+.tb-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;border:1.5px solid #e2e8f0;background:#fff;font-size:11px;font-weight:600;cursor:pointer;color:#475569;transition:all .15s}
+.tb-btn:hover{border-color:#93c5fd;background:#eff6ff;color:#2563eb}
+.tb-btn.reset{color:#94a3b8}
+.tb-btn.reset:hover{border-color:#fca5a5;background:#fef2f2;color:#dc2626}
+.note-color-btn{width:22px;height:22px;border-radius:5px;border:2px solid rgba(0,0,0,.1);cursor:pointer;transition:transform .1s;flex-shrink:0}
+.note-color-btn:hover{transform:scale(1.2)}
+.zoom-group{display:flex;align-items:center;border:1.5px solid #e2e8f0;border-radius:6px;overflow:hidden;background:#fff}
+.zoom-btn{padding:5px 10px;border:none;background:none;font-size:14px;font-weight:700;cursor:pointer;color:#475569;transition:background .15s;line-height:1}
+.zoom-btn:hover{background:#eff6ff;color:#2563eb}
+.zoom-display{padding:4px 10px;font-size:11px;font-weight:700;color:#475569;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;min-width:46px;text-align:center;cursor:pointer;transition:background .15s}
+.zoom-display:hover{background:#f1f5f9}
+
+.graph-canvas-wrap{padding:28px;min-height:100%;cursor:grab}
+.graph-canvas-wrap.panning{cursor:grabbing}
+.graph{position:relative;min-width:1200px;min-height:600px}
+
+svg.arrows{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:block}
+
+/* ── ノード（付箋より前面：z-index:10） ── */
+.node{position:absolute;border-radius:8px;padding:6px 14px;display:flex;align-items:center;justify-content:center;text-align:center;min-height:44px;cursor:grab;transition:box-shadow .18s,opacity .18s;border:2px solid;white-space:pre-wrap;word-break:break-word;font-size:13px;font-weight:600;z-index:10;box-shadow:0 1px 4px rgba(0,0,0,.08);user-select:none}
+.node:hover{box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.node.dragging-node{box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:30;transition:none}
+.node.highlight{box-shadow:0 0 0 3px #2563eb,0 4px 20px rgba(37,99,235,.18)}
+.node.dim{opacity:.15}
+
+.cat-external{background:#f8fafc;border-color:#cbd5e1;color:#64748b}
+.cat-entry{background:#fffbeb;border-color:#d97706;color:#92400e}
+.cat-detail{background:#eff6ff;border-color:#3b82f6;color:#1d4ed8}
+.cat-tool{background:#f0fdf4;border-color:#22c55e;color:#15803d}
+.cat-parallel{background:#faf5ff;border-color:#a855f7;color:#7e22ce}
+.cat-output{background:#f0fdfa;border-color:#14b8a6;color:#0f766e}
+.cat-config{background:#fff7ed;border-color:#f97316;color:#c2410c}
+.agent-badge{position:absolute;top:-9px;right:-9px;background:#7c3aed;color:#fff;border-radius:10px;font-size:9px;font-weight:800;padding:2px 6px;white-space:nowrap;line-height:1.3;border:1.5px solid #fff;pointer-events:none;z-index:31}
+.agent-badge.forbidden{background:#dc2626}
+
+/* ── 付箋（ノードより後面：z-index:3、リサイズ可） ── */
+.sticky-note{position:absolute;z-index:3;width:300px;height:200px;min-width:160px;min-height:80px;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.12),0 1px 4px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden;resize:both}
+.note-header{display:flex;align-items:center;padding:9px 8px 7px;min-height:36px;cursor:grab;gap:4px;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0}
+.note-header:active{cursor:grabbing}
+.note-grip{font-size:16px;color:rgba(0,0,0,.35);letter-spacing:-1px;line-height:1;padding:0 4px;cursor:grab}
+.note-color-dot{width:8px;height:8px;border-radius:50%;margin-left:2px}
+.note-delete{margin-left:auto;width:18px;height:18px;border-radius:4px;border:none;background:none;cursor:pointer;font-size:13px;color:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;line-height:1;transition:all .1s;flex-shrink:0}
+.note-delete:hover{background:rgba(220,38,38,.1);color:#dc2626}
+.note-body{flex:1;min-height:0;padding:8px 10px;font-size:11px;color:#1e293b;outline:none;background:transparent;border:none;resize:none;overflow-y:auto;overflow-x:auto;line-height:1.5;font-family:'Consolas','Courier New',monospace;white-space:pre-wrap}
+.note-body:empty::before{content:"メモを入力...";color:rgba(0,0,0,.25);pointer-events:none}
+.note-title{flex:1;font-size:11px;font-weight:700;color:rgba(0,0,0,.6);outline:none;background:transparent;border:none;cursor:text;overflow:hidden;white-space:nowrap;min-width:0;padding:0 4px}
+.note-title:empty::before{content:"タイトル...";color:rgba(0,0,0,.2);font-weight:400}
+
+/* ── 展開ボタン ── */
+.node-expand-btn{position:absolute;top:-9px;left:-9px;background:#0ea5e9;color:#fff;border-radius:10px;font-size:9px;font-weight:800;padding:2px 5px;cursor:pointer;z-index:31;border:1.5px solid #fff;user-select:none;transition:background .15s}
+.node-expand-btn:hover{background:#0284c7}
+.node.expanded>.node-expand-btn{background:#0284c7}
+
+/* ── フライアウト（ファイルリスト） ── */
+.node-flyout{position:absolute;z-index:40;background:#fff;border:1.5px solid #bae6fd;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.13);min-width:200px;max-width:280px;overflow:hidden}
+.flyout-header{padding:6px 12px;font-size:10px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #e0f2fe;background:#f0f9ff;display:flex;align-items:center;gap:6px}
+.flyout-item{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:11px;color:#334155;font-family:'Consolas','Courier New',monospace;cursor:pointer;transition:background .1s;border-bottom:1px solid #f8fafc}
+.flyout-item:last-child{border-bottom:none}
+.flyout-item:hover{background:#f0f9ff}
+.flyout-item.is-folder{font-weight:700;color:#1e40af}
+.flyout-item .fi-icon{width:16px;text-align:center;flex-shrink:0}
+.flyout-item .fi-label{flex:1}
+.flyout-item .fi-role{font-size:9px;color:#94a3b8;margin-left:4px;white-space:nowrap}
+.flyout-expand-toggle{margin-left:auto;font-size:9px;color:#94a3b8;padding:1px 3px}
+.flyout-sub{border-left:2px solid #bae6fd;margin-left:16px}
+
+/* ── 右パネル（サイドバー・幅リサイズ可） ── */
+.panel-resizer{width:5px;flex-shrink:0;background:#e2e8f0;cursor:col-resize;transition:background .2s;z-index:50}
+.panel-resizer:hover,.panel-resizer.resizing{background:#93c5fd}
+.panel-resizer.hidden{display:none}
+.right-panel{width:330px;flex-shrink:0;display:flex;flex-direction:column;background:#fff;overflow:hidden;border-left:1px solid #e2e8f0;min-width:180px;max-width:600px;transition:width .2s}
+.right-panel.collapsed{width:0!important;min-width:0!important;border-left:none;overflow:hidden}
+.panel-toggle-btn{width:18px;flex-shrink:0;background:#f8fafc;border-left:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:#94a3b8;user-select:none;transition:background .15s,color .15s;z-index:52}
+.panel-toggle-btn:hover{background:#eff6ff;color:#2563eb}
+.panel-section{flex-shrink:0}
+.panel-section.scrollable{flex:1;overflow-y:auto;min-height:0}
+.panel-title{padding:12px 18px 9px;font-size:10px;font-weight:800;letter-spacing:1.2px;color:#94a3b8;text-transform:uppercase;border-bottom:1px solid #f1f5f9;background:#f8fafc}
+.flows-list{padding:10px}
+.flow-btn{width:100%;text-align:left;padding:11px 13px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;margin-bottom:6px;transition:all .15s;font-size:12px}
+.flow-btn:hover{background:#f0f9ff;border-color:#93c5fd}
+.flow-btn.active{background:#eff6ff;border-color:#3b82f6}
+.flow-btn .fname{font-weight:700;display:block;margin-bottom:3px;color:#0f172a;font-size:13px}
+.flow-btn .fdesc{font-size:11px;color:#94a3b8;line-height:1.4}
+.node-detail{padding:16px 18px}
+.nd-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:3px}
+.nd-cat{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+.nd-desc{font-size:12px;color:#475569;line-height:1.7}
+.nd-meta{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.nd-meta-row{display:flex;gap:8px;font-size:11px}
+.nd-meta-label{color:#94a3b8;width:56px;flex-shrink:0}
+.nd-meta-val{color:#334155;font-weight:500}
+.steps-list{padding:10px 18px;overflow-y:auto}
+.step-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9}
+.step-item:last-child{border:none}
+.step-n{width:24px;height:24px;border-radius:50%;background:#e0e7ff;color:#4338ca;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-n.par{background:#f3e8ff;color:#7e22ce}
+.step-text{font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px}
+.step-detail{font-size:11px;color:#64748b;line-height:1.6}
+.step-executor{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-top:5px;text-transform:uppercase;letter-spacing:.5px}
+.ex-claude{background:#fef9c3;color:#92400e}
+.ex-sub{background:#f3e8ff;color:#7e22ce}
+.panel-empty{color:#94a3b8;font-size:12px;padding:20px 18px;text-align:center;line-height:1.6}
+
+/* 矢印 */
+.conn{fill:none;stroke:#cbd5e1;stroke-width:1.8;transition:stroke .2s,opacity .2s}
+.conn.dashed{stroke-dasharray:5,4}
+.conn.par{stroke:#c084fc}
+.conn.highlight{stroke:#2563eb;stroke-width:2.5}
+.conn.par.highlight{stroke:#7c3aed}
+.conn.dim{opacity:.07}
+.conn-label-div{position:absolute;font-size:10px;color:#94a3b8;background:rgba(248,250,252,.85);padding:1px 5px;border-radius:3px;cursor:grab;user-select:none;z-index:5;white-space:nowrap;border:1px solid #e2e8f0}
+.node-badge{position:absolute;top:-9px;left:-9px;width:20px;height:20px;border-radius:50%;background:#2563eb;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:16;pointer-events:none;box-shadow:0 2px 6px rgba(37,99,235,.45);line-height:1}
+.conn-label-div:hover{color:#475569;background:#f1f5f9;border-color:#cbd5e1}
+.conn-label-div.dragging-label{cursor:grabbing;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+</style>
+</head>
+<body>
+
+<div class="tab-bar" id="tab-bar"></div>
+
+<header>
+  <span style="font-size:20px" id="hdr-icon">📊</span>
+  <div>
+    <h1 id="hdr-title"><span id="hdr-name" contenteditable="true" spellcheck="false" title="クリックして名前を編集"></span><span id="hdr-suffix" style="color:#94a3b8;font-weight:400"> — Architecture & Flows</span></h1>
+    <p id="hdr-path"></p>
+  </div>
+  <span class="hint">空白ドラッグで画面移動 · ⚡ 自動整列 → ノードドラッグで微調整 · フロー選択でパスをハイライト</span>
+</header>
+
+<div class="legend">
+  <div class="lg"><div class="lg-dot" style="background:#d97706"></div>玄関</div>
+  <div class="lg"><div class="lg-dot" style="background:#3b82f6"></div>詳細手順書</div>
+  <div class="lg"><div class="lg-dot" style="background:#22c55e"></div>Pythonスクリプト</div>
+  <div class="lg"><div class="lg-dot" style="background:#a855f7"></div>Subagent（並列）</div>
+  <div class="lg"><div class="lg-dot" style="background:#f97316"></div>設定ファイル</div>
+  <div class="lg"><div class="lg-dot" style="background:#cbd5e1"></div>外部ファイル</div>
+  <div class="lg"><div class="lg-dot" style="background:#14b8a6"></div>出力</div>
+</div>
+
+<div class="workspace">
+  <div class="graph-wrap" id="graph-wrap">
+    <div class="graph-toolbar">
+      <span class="toolbar-label">付箋</span>
+      <div class="note-color-btn" style="background:#fef08a" title="黄色の付箋" onclick="addNote('#fef08a','#ca8a04')"></div>
+      <div class="note-color-btn" style="background:#fbcfe8" title="ピンクの付箋" onclick="addNote('#fbcfe8','#be185d')"></div>
+      <div class="note-color-btn" style="background:#bfdbfe" title="青の付箋" onclick="addNote('#bfdbfe','#1d4ed8')"></div>
+      <div class="note-color-btn" style="background:#bbf7d0" title="緑の付箋" onclick="addNote('#bbf7d0','#15803d')"></div>
+      <div style="width:1px;height:20px;background:#e2e8f0;margin:0 4px"></div>
+      <button class="tb-btn" onclick="autoLayout()" title="接続関係から自動でノードを並べる">⚡ 自動整列</button>
+      <button class="tb-btn reset" onclick="resetPositions()" title="ノード位置を初期状態に戻す">↺ 位置リセット</button>
+      <div style="width:1px;height:20px;background:#e2e8f0;margin:0 4px"></div>
+      <span class="toolbar-label">ズーム</span>
+      <div class="zoom-group">
+        <button class="zoom-btn" onclick="zoomOut()" title="縮小">−</button>
+        <span class="zoom-display" id="zoom-display" onclick="zoomReset()" title="クリックで100%に戻す">100%</span>
+        <button class="zoom-btn" onclick="zoomIn()" title="拡大">＋</button>
+      </div>
+    </div>
+    <div class="graph-canvas-wrap">
+      <div class="graph" id="graph" tabindex="-1">
+        <svg class="arrows" id="svg-layer" width="0" height="0">
+          <defs>
+            <marker id="arr"       markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" overflow="hidden"><path d="M0,0 L0,6 L8,3 z" fill="#cbd5e1"/></marker>
+            <marker id="arr-hi"    markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" overflow="hidden"><path d="M0,0 L0,6 L8,3 z" fill="#2563eb"/></marker>
+            <marker id="arr-par"   markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" overflow="hidden"><path d="M0,0 L0,6 L8,3 z" fill="#c084fc"/></marker>
+            <marker id="arr-par-hi" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" overflow="hidden"><path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/></marker>
+          </defs>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-resizer" id="panel-resizer"></div>
+  <div class="panel-toggle-btn" id="panel-toggle-btn" onclick="togglePanel()" title="右パネルを開閉">◀</div>
+
+  <div class="right-panel" id="right-panel">
+  <div class="panel-section">
+    <div class="panel-title">FLOWS</div>
+    <div class="flows-list" id="flows-list"></div>
+  </div>
+  <div class="panel-section">
+    <div class="panel-title" id="detail-title">NODE / STEPS</div>
+  </div>
+  <div class="panel-section scrollable">
+    <div id="detail-body"><div class="panel-empty">← フローを選択するか<br>ノードをクリックしてください</div></div>
+  </div>
+  </div><!-- right-panel -->
+</div><!-- workspace -->
+
+<script>
+/* ═══════════════════════ DATA ═══════════════════════ */
+const SKILLS_DATA = {
+  example: {
+    name: "My Skill",
+    icon: "🔧",
+    path: ".claude/skills/my-skill/",
+    nodes: [
+      {id:"ex_user",    label:"ユーザー",        x:40,  y:180, w:110, h:44, cat:"external",
+       role:"スキル起動トリガー",
+       desc:"トリガーワードを発言するとスキルが起動する。SKILL.md の description に定義されたキーワードが対象。",
+       meta:{trigger:"キーワードを入力"}},
+      {id:"ex_skill",   label:"SKILL.md",         x:220, y:180, w:130, h:44, cat:"entry",
+       role:"スキルのエントリーポイント",
+       desc:"Claudeが最初に読む指示書。ステップ・ルール・フォーマットが定義されている。500行以下を推奨。",
+       meta:{lines:"〜100行", location:".claude/skills/"}},
+      {id:"ex_process", label:"処理ステップ",     x:430, y:80,  w:140, h:44, cat:"tool",
+       role:"メイン処理",
+       desc:"SKILL.mdの手順に従って処理を実行する。ファイルの読み取り・生成・変換などを担当。",
+       meta:{exec:"claude"}},
+      {id:"ex_sub",     label:"サブエージェント", x:430, y:280, w:160, h:44, cat:"parallel",
+       role:"並列処理担当",
+       desc:"並列で実行されるサブエージェント。複数タスクを同時に処理することで速度を上げる。",
+       meta:{exec:"sub", count:"×N"}},
+      {id:"ex_output",  label:"output.html",      x:660, y:180, w:140, h:44, cat:"output",
+       role:"最終成果物",
+       desc:"スキルが生成する成果物。形式はスキルによって .html / .pptx / .md など異なる。",
+       meta:{format:".html / .pptx / .md など", path:"output/"}}
+    ],
+    connections: [
+      {from:"ex_user",    to:"ex_skill",   type:"normal"},
+      {from:"ex_skill",   to:"ex_process", type:"dashed", label:"メインフロー"},
+      {from:"ex_skill",   to:"ex_sub",     type:"dashed", label:"並列フロー"},
+      {from:"ex_process", to:"ex_output",  type:"normal"},
+      {from:"ex_sub",     to:"ex_output",  type:"par"}
+    ],
+    flows: [
+      {
+        id:"flow_main",
+        name:"メインフロー",
+        desc:"スキルの基本的な実行フロー（Claude単独）",
+        nodes:["ex_user","ex_skill","ex_process","ex_output"],
+        conns:["ex_user→ex_skill","ex_skill→ex_process","ex_process→ex_output"],
+        steps:[
+          {n:1, text:"トリガー検出",      detail:"ユーザーのメッセージからトリガーワードを検出する", exec:"claude"},
+          {n:2, text:"SKILL.md 読み込み", detail:"エントリーポイントを読んで手順・ルールを把握する", exec:"claude"},
+          {n:3, text:"処理実行",          detail:"定義された手順に従ってファイル生成・変換などを実行する", exec:"claude"},
+          {n:4, text:"成果物を出力",      detail:"output/ 配下に指定フォーマットで成果物を生成する", exec:"claude"}
+        ]
+      },
+      {
+        id:"flow_parallel",
+        name:"並列フロー",
+        desc:"サブエージェントを活用した並列処理フロー",
+        nodes:["ex_skill","ex_sub","ex_output"],
+        conns:["ex_skill→ex_sub","ex_sub→ex_output"],
+        steps:[
+          {n:1, text:"サブエージェント起動", detail:"並列処理が必要なタスクをサブエージェントに委譲する", exec:"sub"},
+          {n:2, text:"結果を統合して出力",   detail:"サブエージェントの結果を集約して成果物を生成する", exec:"claude"}
+        ]
+      }
+    ]
+  }
+};
+
+/* ═══════════════════════ STATE ═══════════════════════ */
+let currentSkillId = 'example';
+let activeFlow = null;
+let nodePositions = {};
+let labelOffsets = {};
+let notes = {};
+let expandedNodes = {};
+let nodeMap = {};
+let zoomLevel = 1.0;
+const ZOOM_MIN = 0.3, ZOOM_MAX = 2.0, ZOOM_STEP = 0.1;
+
+function getSkill() { return SKILLS_DATA[currentSkillId]; }
+
+/* ═══════════════════════ ZOOM ═══════════════════════ */
+function applyZoom() {
+  document.getElementById('graph').style.zoom = zoomLevel;
+  document.getElementById('zoom-display').textContent = Math.round(zoomLevel * 100) + '%';
+}
+function zoomIn()    { zoomLevel = +(Math.min(ZOOM_MAX, zoomLevel + ZOOM_STEP).toFixed(1)); applyZoom(); }
+function zoomOut()   { zoomLevel = +(Math.max(ZOOM_MIN, zoomLevel - ZOOM_STEP).toFixed(1)); applyZoom(); }
+function zoomReset() { zoomLevel = 1.0; applyZoom(); }
+
+/* ═══════════════════════ POSITIONS ═══════════════════════ */
+function initPositions(skillId) {
+  if (!nodePositions[skillId]) {
+    const saved = localStorage.getItem(`arch-pos-${skillId}`);
+    const nodeIds = SKILLS_DATA[skillId].nodes.map(n => n.id);
+    const savedPos = saved ? JSON.parse(saved) : null;
+    const isValid = savedPos && nodeIds.every(id => savedPos[id] !== undefined);
+    nodePositions[skillId] = isValid ? savedPos
+      : Object.fromEntries(SKILLS_DATA[skillId].nodes.map(n => [n.id, {x:n.x, y:n.y}]));
+  }
+  if (!labelOffsets[skillId]) {
+    const saved = localStorage.getItem(`arch-label-${skillId}`);
+    labelOffsets[skillId] = saved ? JSON.parse(saved) : {};
+  }
+}
+
+function savePositions() {
+  localStorage.setItem(`arch-pos-${currentSkillId}`, JSON.stringify(nodePositions[currentSkillId]));
+}
+
+function getPos(nodeId) {
+  return nodePositions[currentSkillId][nodeId];
+}
+
+function resetPositions() {
+  nodePositions[currentSkillId] = Object.fromEntries(
+    getSkill().nodes.map(n => [n.id, {x:n.x, y:n.y}])
+  );
+  labelOffsets[currentSkillId] = {};
+  localStorage.removeItem(`arch-pos-${currentSkillId}`);
+  localStorage.removeItem(`arch-label-${currentSkillId}`);
+  rerenderAll();
+}
+
+function autoLayout() {
+  const skill = getSkill();
+  const nodes = skill.nodes;
+  const conns = skill.connections;
+
+  /* 各ノードの outgoing エッジを構築 */
+  const outgoing = {};
+  nodes.forEach(n => { outgoing[n.id] = []; });
+  conns.forEach(c => {
+    if (outgoing[c.from] !== undefined) outgoing[c.from].push(c.to);
+  });
+
+  /* Kahn法（トポロジカルBFS）で各ノードの最長パス長（レイヤー）を算出 */
+  const inDeg = {};
+  nodes.forEach(n => { inDeg[n.id] = 0; });
+  conns.forEach(c => { if (inDeg[c.to] !== undefined) inDeg[c.to]++; });
+
+  const level = {};
+  nodes.forEach(n => { level[n.id] = 0; });
+
+  /* in-degree 0 のノードが真のソース */
+  const bfsQueue = nodes.filter(n => inDeg[n.id] === 0).map(n => n.id);
+
+  /* 完全サイクルで起点がない場合: external/entry → 全ノードの順でフォールバック */
+  if (bfsQueue.length === 0) {
+    nodes.filter(n => ['external','entry'].includes(n.cat))
+         .forEach(n => { bfsQueue.push(n.id); inDeg[n.id] = 0; });
+  }
+  if (bfsQueue.length === 0) nodes.forEach(n => bfsQueue.push(n.id));
+
+  /* 全親が処理し終わった瞬間に子をキューに積む → 最長パスが正確に確定 */
+  const processed = new Set();
+  while (bfsQueue.length) {
+    const id = bfsQueue.shift();
+    if (processed.has(id)) continue;
+    processed.add(id);
+    (outgoing[id] || []).forEach(toId => {
+      level[toId] = Math.max(level[toId] || 0, (level[id] || 0) + 1);
+      inDeg[toId]--;
+      if (inDeg[toId] <= 0 && !processed.has(toId)) bfsQueue.push(toId);
+    });
+  }
+  /* サイクルで取り残されたノード（未処理）は末尾レイヤーへ */
+  const maxLv = nodes.reduce((m, n) => Math.max(m, level[n.id] || 0), 0);
+  nodes.forEach(n => { if (!processed.has(n.id)) level[n.id] = maxLv; });
+
+  /* レイヤーごとにグルーピング */
+  const layers = {};
+  nodes.forEach(n => {
+    const lv = level[n.id];
+    (layers[lv] = layers[lv] || []).push(n);
+  });
+
+  const X_ORIGIN = 40, X_STEP = 300;
+  const Y_ORIGIN = 40, Y_STEP = 120;
+
+  /* 新しい座標を計算 */
+  const newPos = {};
+  Object.entries(layers).forEach(([lv, layerNodes]) => {
+    const x = X_ORIGIN + parseInt(lv) * X_STEP;
+    layerNodes.forEach((n, i) => {
+      newPos[n.id] = { x, y: Y_ORIGIN + i * Y_STEP };
+    });
+  });
+
+  nodePositions[currentSkillId] = newPos;
+  savePositions();
+  rerenderAll();
+}
+
+/* ═══════════════════════ NOTES ═══════════════════════ */
+function loadNotes(skillId) {
+  if (notes[skillId]) return;
+  try {
+    const saved = localStorage.getItem(`arch-notes-${skillId}`);
+    notes[skillId] = saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    notes[skillId] = [];
+  }
+}
+
+function saveNotes() {
+  localStorage.setItem(`arch-notes-${currentSkillId}`, JSON.stringify(notes[currentSkillId]));
+}
+
+function addNote(bg, fg) {
+  const wrap = document.getElementById('graph-wrap');
+  const note = {
+    id: Date.now().toString(),
+    x: wrap.scrollLeft + 60,
+    y: wrap.scrollTop + 80,
+    w: 300, h: 200,
+    title: '', text: '', bg, fg
+  };
+  notes[currentSkillId].push(note);
+  saveNotes();
+  renderNote(note);
+}
+
+function renderNote(note) {
+  const el = document.createElement('div');
+  el.className = 'sticky-note';
+  el.id = `note-${note.id}`;
+  el.style.cssText = `left:${note.x}px;top:${note.y}px;width:${note.w||180}px;height:${note.h||120}px;background:${note.bg}`;
+
+  const header = document.createElement('div');
+  header.className = 'note-header';
+  header.style.borderBottomColor = note.fg + '33';
+
+  const grip = document.createElement('span');
+  grip.className = 'note-grip';
+  grip.style.color = note.fg + '88';
+  grip.textContent = '⠿';
+
+  const dot = document.createElement('span');
+  dot.className = 'note-color-dot';
+  dot.style.background = note.fg;
+
+  const titleEl = document.createElement('span');
+  titleEl.className = 'note-title';
+  titleEl.contentEditable = 'true';
+  titleEl.textContent = note.title || '';
+  titleEl.addEventListener('pointerdown', e => e.stopPropagation());
+  titleEl.addEventListener('input', () => {
+    const n = notes[currentSkillId].find(n => n.id === note.id);
+    if (n) { n.title = titleEl.textContent; saveNotes(); }
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'note-delete';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('pointerdown', e => e.stopPropagation());
+  delBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    deleteNote(note.id);
+  });
+
+  header.appendChild(grip);
+  header.appendChild(dot);
+  header.appendChild(titleEl);
+  header.appendChild(delBtn);
+
+  const body = document.createElement('div');
+  body.className = 'note-body';
+  body.contentEditable = 'true';
+  body.textContent = note.text;
+  body.addEventListener('input', () => {
+    const n = notes[currentSkillId].find(n => n.id === note.id);
+    if (n) { n.text = body.textContent; saveNotes(); }
+  });
+  body.addEventListener('pointerdown', e => e.stopPropagation());
+
+  el.appendChild(header);
+  el.appendChild(body);
+  document.getElementById('graph').appendChild(el);
+
+  /* リサイズ検出：サイズ変更をlocalStorageに保存 */
+  const ro = new ResizeObserver(() => {
+    const n = notes[currentSkillId].find(n => n.id === note.id);
+    if (n) {
+      n.w = el.offsetWidth;
+      n.h = el.offsetHeight;
+      saveNotes();
+    }
+  });
+  ro.observe(el);
+
+  makeNoteDraggable(header, el, note.id);
+}
+
+function deleteNote(id) {
+  notes[currentSkillId] = notes[currentSkillId].filter(n => n.id !== id);
+  saveNotes();
+  const el = document.getElementById(`note-${id}`);
+  if (el) el.remove();
+}
+
+/* ═══════════════════════ EXPAND / FLYOUT ═══════════════════════ */
+function getExpanded() {
+  if (!expandedNodes[currentSkillId]) expandedNodes[currentSkillId] = new Set();
+  return expandedNodes[currentSkillId];
+}
+
+function toggleExpand(nodeId, e) {
+  e && e.stopPropagation();
+  const exp = getExpanded();
+  const flyoutEl = document.getElementById(`flyout-${nodeId}`);
+  const nodeEl   = document.getElementById(`node-${nodeId}`);
+  const btn      = document.getElementById(`expand-btn-${nodeId}`);
+  if (exp.has(nodeId)) {
+    exp.delete(nodeId);
+    flyoutEl && flyoutEl.remove();
+    nodeEl && nodeEl.classList.remove('expanded');
+    if (btn) btn.textContent = '▶';
+  } else {
+    exp.add(nodeId);
+    renderFlyout(nodeId);
+    nodeEl && nodeEl.classList.add('expanded');
+    if (btn) btn.textContent = '▼';
+  }
+}
+
+function flyoutIcon(label) {
+  if (!label) return '📄';
+  if (label.endsWith('/'))  return '📁';
+  if (label.endsWith('.py'))return '🐍';
+  if (label.endsWith('.js'))return '📜';
+  if (label.endsWith('.md'))return '📝';
+  if (label.endsWith('.cjs'))return '📜';
+  return '📄';
+}
+
+function renderFlyoutItem(container, child) {
+  const item = document.createElement('div');
+  item.className = 'flyout-item' + (child.expandable ? ' is-folder' : '');
+
+  const icon = document.createElement('span');
+  icon.className = 'fi-icon';
+  icon.textContent = flyoutIcon(child.label);
+  item.appendChild(icon);
+
+  const lbl = document.createElement('span');
+  lbl.className = 'fi-label';
+  lbl.textContent = child.label;
+  item.appendChild(lbl);
+
+  if (child.role) {
+    const role = document.createElement('span');
+    role.className = 'fi-role';
+    role.textContent = child.role;
+    item.appendChild(role);
+  }
+
+  if (child.expandable && child.children?.length) {
+    const tog = document.createElement('span');
+    tog.className = 'flyout-expand-toggle';
+    tog.textContent = '▶';
+    item.appendChild(tog);
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      const subId = `flyout-sub-${child.id}`;
+      const existing = container.querySelector(`[data-sub="${child.id}"]`);
+      if (existing) {
+        existing.remove();
+        tog.textContent = '▶';
+      } else {
+        const sub = document.createElement('div');
+        sub.className = 'flyout-sub';
+        sub.dataset.sub = child.id;
+        child.children.forEach(gc => renderFlyoutItem(sub, gc));
+        item.insertAdjacentElement('afterend', sub);
+        tog.textContent = '▼';
+      }
+    });
+  }
+  container.appendChild(item);
+}
+
+function renderFlyout(nodeId) {
+  const node = nodeMap[nodeId];
+  if (!node || !node.children) return;
+
+  const pos    = getPos(nodeId);
+  const nodeEl = document.getElementById(`node-${nodeId}`);
+  const nodeH  = nodeEl ? nodeEl.offsetHeight : 44;
+
+  const flyout = document.createElement('div');
+  flyout.className = 'node-flyout';
+  flyout.id = `flyout-${nodeId}`;
+  flyout.style.cssText = `left:${pos.x}px;top:${pos.y + nodeH + 6}px`;
+  flyout.addEventListener('pointerdown', e => e.stopPropagation());
+
+  const hdr = document.createElement('div');
+  hdr.className = 'flyout-header';
+  hdr.textContent = '📁 ' + (node.expandLabel || node.label);
+  flyout.appendChild(hdr);
+
+  node.children.forEach(child => renderFlyoutItem(flyout, child));
+
+  document.getElementById('graph').appendChild(flyout);
+}
+
+/* ═══════════════════════ DRAG — NODES ═══════════════════════ */
+function makeDraggable(el, nodeId) {
+  let startPos, startMouse, hasMoved;
+
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    startPos  = {...getPos(nodeId)};
+    startMouse = {x: e.clientX, y: e.clientY};
+    hasMoved  = false;
+    el.classList.add('dragging-node');
+    document.body.classList.add('is-dragging');
+  });
+
+  el.addEventListener('pointermove', e => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    const dx = (e.clientX - startMouse.x) / zoomLevel;
+    const dy = (e.clientY - startMouse.y) / zoomLevel;
+    if (!hasMoved && Math.hypot(dx, dy) < 4) return;
+    hasMoved = true;
+
+    const newX = Math.max(0, startPos.x + dx);
+    const newY = Math.max(0, startPos.y + dy);
+    nodePositions[currentSkillId][nodeId] = {x: newX, y: newY};
+    el.style.left = newX + 'px';
+    el.style.top  = newY + 'px';
+    updateConnections(nodeId);
+  });
+
+  el.addEventListener('pointerup', e => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    el.releasePointerCapture(e.pointerId);
+    el.classList.remove('dragging-node');
+    document.body.classList.remove('is-dragging');
+    if (!hasMoved) showNodeDetail(nodeId);
+    else savePositions();
+  });
+}
+
+/* ═══════════════════════ DRAG — NOTES ═══════════════════════ */
+function makeNoteDraggable(handle, noteEl, noteId) {
+  let startPos, startMouse;
+
+  handle.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.note-delete') || e.target.closest('.note-title')) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    const note = notes[currentSkillId].find(n => n.id === noteId);
+    startPos  = {x: note.x, y: note.y};
+    startMouse = {x: e.clientX, y: e.clientY};
+    noteEl.style.zIndex = '8';  /* ノード(10)より下を維持 */
+    document.body.classList.add('is-dragging');
+  });
+
+  handle.addEventListener('pointermove', e => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    const dx = (e.clientX - startMouse.x) / zoomLevel;
+    const dy = (e.clientY - startMouse.y) / zoomLevel;
+    const newX = Math.max(0, startPos.x + dx);
+    const newY = Math.max(0, startPos.y + dy);
+    const note = notes[currentSkillId].find(n => n.id === noteId);
+    if (note) { note.x = newX; note.y = newY; }
+    noteEl.style.left = newX + 'px';
+    noteEl.style.top  = newY + 'px';
+  });
+
+  handle.addEventListener('pointerup', e => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    handle.releasePointerCapture(e.pointerId);
+    noteEl.style.zIndex = '3';  /* 通常時はノード(10)より下 */
+    document.body.classList.remove('is-dragging');
+    saveNotes();
+  });
+}
+
+/* ═══════════════════════ ARROWS ═══════════════════════ */
+function calcPath(conn) {
+  const f = nodeMap[conn.from], t = nodeMap[conn.to];
+  if (!f || !t) return '';
+  const fp = getPos(conn.from), tp = getPos(conn.to);
+  const sx = fp.x + f.w, sy = fp.y + f.h/2;
+  const tx = tp.x,        ty = tp.y + t.h/2;
+  const mx = (sx + tx) / 2;
+  return `M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`;
+}
+
+function updateConnections(movedNodeId) {
+  getSkill().connections.forEach(c => {
+    if (c.from !== movedNodeId && c.to !== movedNodeId) return;
+    const el = document.getElementById(`conn-${c.from}-${c.to}`);
+    if (el) el.setAttribute('d', calcPath(c));
+    updateLabelPos(c);
+  });
+  resizeCanvas();
+}
+
+/* ═══════════════════════ RENDER ═══════════════════════ */
+function buildNodeMap() {
+  nodeMap = {};
+  getSkill().nodes.forEach(n => nodeMap[n.id] = n);
+}
+
+function renderTabs() {
+  document.getElementById('tab-bar').innerHTML = Object.entries(SKILLS_DATA).map(([id,s]) =>
+    `<div class="tab ${id===currentSkillId?'active':''}" onclick="switchSkill('${id}')">${s.icon} ${s.name}</div>`
+  ).join('');
+}
+
+function updateHeader() {
+  const s = getSkill();
+  document.getElementById('hdr-icon').textContent = s.icon;
+  document.getElementById('hdr-name').textContent = s.name;
+  document.getElementById('hdr-path').textContent = s.path;
+}
+
+function clearGraphContent() {
+  document.querySelectorAll('.node').forEach(e => e.remove());
+  document.querySelectorAll('.node-flyout').forEach(e => e.remove());
+  document.querySelectorAll('.sticky-note').forEach(e => e.remove());
+  document.querySelectorAll('.conn-label-div').forEach(e => e.remove());
+  const svg = document.getElementById('svg-layer');
+  while (svg.children.length > 1) svg.removeChild(svg.lastChild);
+}
+
+function renderNodes() {
+  const graph = document.getElementById('graph');
+  getSkill().nodes.forEach(n => {
+    const pos = getPos(n.id);
+    const el = document.createElement('div');
+    el.className = `node cat-${n.cat}`;
+    el.id = `node-${n.id}`;
+    el.style.cssText = `left:${pos.x}px;top:${pos.y}px;width:${n.w}px`;
+    const labelEl = document.createElement('span');
+    labelEl.textContent = n.label;
+    el.appendChild(labelEl);
+    if (n.agentCount !== undefined) {
+      const badge = document.createElement('div');
+      badge.className = 'agent-badge' + (String(n.agentCount).includes('禁') || String(n.agentCount).includes('⛔') ? ' forbidden' : '');
+      badge.textContent = n.agentCount;
+      el.appendChild(badge);
+    }
+    if (n.expandable) {
+      const isExp = getExpanded().has(n.id);
+      if (isExp) el.classList.add('expanded');
+      const btn = document.createElement('div');
+      btn.className = 'node-expand-btn';
+      btn.id = `expand-btn-${n.id}`;
+      btn.textContent = isExp ? '▼' : '▶';
+      btn.title = isExp ? '折りたたむ' : '展開（ファイル一覧）';
+      btn.addEventListener('pointerdown', e => e.stopPropagation());
+      btn.addEventListener('click', e => toggleExpand(n.id, e));
+      el.appendChild(btn);
+    }
+    graph.appendChild(el);
+    if (n.expandable && getExpanded().has(n.id)) {
+      setTimeout(() => renderFlyout(n.id), 0);
+    }
+    if (nodeMap[n.id]) nodeMap[n.id].h = el.offsetHeight;
+    makeDraggable(el, n.id);
+  });
+}
+
+function resizeCanvas() {
+  const positions = nodePositions[currentSkillId] || {};
+  let maxX = 1200, maxY = 600;
+  getSkill().nodes.forEach(n => {
+    const p = positions[n.id];
+    if (!p) return;
+    maxX = Math.max(maxX, p.x + (n.w || 160) + 80);
+    maxY = Math.max(maxY, p.y + (nodeMap[n.id] ? nodeMap[n.id].h : (n.h || 44)) + 80);
+  });
+  const graph = document.getElementById('graph');
+  const svg   = document.getElementById('svg-layer');
+  graph.style.width  = maxX + 'px';
+  graph.style.height = maxY + 'px';
+  svg.style.width    = maxX + 'px';
+  svg.style.height   = maxY + 'px';
+}
+
+function renderArrows() {
+  const svg = document.getElementById('svg-layer');
+  resizeCanvas();
+
+  getSkill().connections.forEach(c => {
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('id', `conn-${c.from}-${c.to}`);
+    path.setAttribute('class', `conn${c.type==='par'?' par':''}${c.type==='dashed'?' dashed':''}`);
+    path.setAttribute('marker-end', c.type==='par'?'url(#arr-par)':'url(#arr)');
+    path.setAttribute('d', calcPath(c));
+    svg.appendChild(path);
+
+  });
+  renderLabels();
+}
+
+/* ═══════════════════════ LABELS ═══════════════════════ */
+function getLabelMid(c) {
+  const f = nodeMap[c.from], t = nodeMap[c.to];
+  if (!f || !t) return {x:0, y:0};
+  const fp = getPos(c.from), tp = getPos(c.to);
+  const sx = fp.x + f.w, sy = fp.y + f.h/2;
+  const tx = tp.x,        ty = tp.y + t.h/2;
+  return { x: (sx+tx)/2 - 20, y: (sy+ty)/2 - 18 };
+}
+
+function renderLabels() {
+  const graph = document.getElementById('graph');
+  getSkill().connections.forEach(c => {
+    if (!c.label) return;
+    const key = `${c.from}-${c.to}`;
+    const mid = getLabelMid(c);
+    const off = (labelOffsets[currentSkillId] || {})[key] || {dx:0, dy:0};
+    const el = document.createElement('div');
+    el.className = 'conn-label-div';
+    el.id = `lbl-${key}`;
+    el.style.left = (mid.x + off.dx) + 'px';
+    el.style.top  = (mid.y + off.dy) + 'px';
+    el.textContent = c.label;
+    graph.appendChild(el);
+    makeLabelDraggable(el, c, key);
+  });
+}
+
+function updateLabelPos(c) {
+  if (!c.label) return;
+  const key = `${c.from}-${c.to}`;
+  const el = document.getElementById(`lbl-${key}`);
+  if (!el) return;
+  const mid = getLabelMid(c);
+  const off = (labelOffsets[currentSkillId] || {})[key] || {dx:0, dy:0};
+  el.style.left = (mid.x + off.dx) + 'px';
+  el.style.top  = (mid.y + off.dy) + 'px';
+}
+
+function makeLabelDraggable(el, conn, key) {
+  let startPx, startMouse, hasMoved;
+
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    startPx    = { x: parseFloat(el.style.left), y: parseFloat(el.style.top) };
+    startMouse = { x: e.clientX, y: e.clientY };
+    hasMoved   = false;
+    el.classList.add('dragging-label');
+    document.body.classList.add('is-dragging');
+  });
+
+  el.addEventListener('pointermove', e => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    const dx = (e.clientX - startMouse.x) / zoomLevel;
+    const dy = (e.clientY - startMouse.y) / zoomLevel;
+    if (!hasMoved && Math.hypot(dx, dy) < 4) return;
+    hasMoved = true;
+    const nx = Math.max(0, startPx.x + dx);
+    const ny = Math.max(0, startPx.y + dy);
+    el.style.left = nx + 'px';
+    el.style.top  = ny + 'px';
+    const mid = getLabelMid(conn);
+    if (!labelOffsets[currentSkillId]) labelOffsets[currentSkillId] = {};
+    labelOffsets[currentSkillId][key] = { dx: nx - mid.x, dy: ny - mid.y };
+  });
+
+  el.addEventListener('pointerup', e => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    el.releasePointerCapture(e.pointerId);
+    el.classList.remove('dragging-label');
+    document.body.classList.remove('is-dragging');
+    if (hasMoved) localStorage.setItem(`arch-label-${currentSkillId}`, JSON.stringify(labelOffsets[currentSkillId]));
+  });
+}
+
+function renderFlows() {
+  document.getElementById('flows-list').innerHTML = getSkill().flows.map(f =>
+    `<button class="flow-btn" id="flow-${f.id}" onclick="activateFlow('${f.id}')">
+      <span class="fname">${f.name}</span>
+      <span class="fdesc">${f.desc}</span>
+    </button>`
+  ).join('');
+}
+
+function renderNotes() {
+  notes[currentSkillId].forEach(n => renderNote(n));
+}
+
+/* ═══════════════════════ INTERACTIONS ═══════════════════════ */
+const catNames  = {external:'外部ファイル',entry:'玄関（エントリー）',detail:'詳細手順書',tool:'Pythonスクリプト',parallel:'サブエージェント',output:'出力ファイル',config:'設定ファイル'};
+const catColors = {external:'#64748b',entry:'#d97706',detail:'#3b82f6',tool:'#22c55e',parallel:'#a855f7',output:'#14b8a6',config:'#f97316'};
+
+function showNodeDetail(nodeId) {
+  if (activeFlow) return;
+  const n = nodeMap[nodeId];
+  if (!n) return;
+  document.getElementById('detail-title').textContent = 'NODE DETAIL';
+  document.getElementById('detail-body').innerHTML = `
+    <div class="node-detail">
+      <div class="nd-title">${n.label}</div>
+      <div class="nd-cat" style="color:${catColors[n.cat]}">${catNames[n.cat]}</div>
+      <div class="nd-desc">${n.desc}</div>
+      <div class="nd-meta">${Object.entries(n.meta).map(([k,v])=>`
+        <div class="nd-meta-row">
+          <span class="nd-meta-label">${k}</span>
+          <span class="nd-meta-val">${v}</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function activateFlow(flowId) {
+  const flow = getSkill().flows.find(f => f.id === flowId);
+  if (!flow) return;
+  activeFlow = flow;
+
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`flow-${flowId}`).classList.add('active');
+
+  document.querySelectorAll('.node-badge').forEach(e => e.remove());
+  getSkill().nodes.forEach(n => {
+    const el = document.getElementById(`node-${n.id}`);
+    if (!el) return;
+    flow.nodes.includes(n.id) ? (el.classList.add('highlight'), el.classList.remove('dim'))
+                               : (el.classList.add('dim'),       el.classList.remove('highlight'));
+  });
+  flow.steps.forEach(s => {
+    if (!s.node) return;
+    const el = document.getElementById(`node-${s.node}`);
+    if (!el) return;
+    const badge = document.createElement('div');
+    badge.className = 'node-badge';
+    badge.textContent = s.n;
+    el.appendChild(badge);
+  });
+
+  getSkill().connections.forEach(c => {
+    const key = `${c.from}→${c.to}`;
+    const el = document.getElementById(`conn-${c.from}-${c.to}`);
+    if (!el) return;
+    const isHi = flow.conns.includes(key);
+    el.classList.toggle('highlight', isHi);
+    el.classList.toggle('dim', !isHi);
+    el.setAttribute('marker-end', isHi
+      ? (c.type==='par'?'url(#arr-par-hi)':'url(#arr-hi)')
+      : (c.type==='par'?'url(#arr-par)':'url(#arr)'));
+  });
+
+  document.getElementById('detail-title').textContent = 'STEPS';
+  document.getElementById('detail-body').innerHTML = flow.steps.map(s => `
+    <div class="step-item">
+      <div class="step-n ${s.exec==='sub'?'par':''}">${s.n}</div>
+      <div>
+        <div class="step-text">${s.text}</div>
+        <div class="step-detail">${s.detail}</div>
+        <span class="step-executor ${s.exec==='sub'?'ex-sub':'ex-claude'}">${s.exec==='sub'?'Subagent 実行':'Claude 実行'}</span>
+      </div>
+    </div>`).join('');
+}
+
+function resetPanel() {
+  activeFlow = null;
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.node-badge').forEach(e => e.remove());
+  getSkill().nodes.forEach(n => {
+    const el = document.getElementById(`node-${n.id}`);
+    if (el) el.classList.remove('highlight','dim');
+  });
+  getSkill().connections.forEach(c => {
+    const el = document.getElementById(`conn-${c.from}-${c.to}`);
+    if (!el) return;
+    el.classList.remove('highlight','dim');
+    el.setAttribute('marker-end', c.type==='par'?'url(#arr-par)':'url(#arr)');
+  });
+  document.getElementById('detail-title').textContent = 'NODE / STEPS';
+  document.getElementById('detail-body').innerHTML = '<div class="panel-empty">← フローを選択するか<br>ノードをクリックしてください</div>';
+}
+
+function switchSkill(id) {
+  currentSkillId = id;
+  activeFlow = null;
+  initPositions(id);
+  loadNotes(id);
+  buildNodeMap();
+  clearGraphContent();
+  renderTabs();
+  updateHeader();
+  renderNodes();
+  renderArrows();
+  renderFlows();
+  renderNotes();
+  resetPanel();
+}
+
+function rerenderAll() {
+  clearGraphContent();
+  renderNodes();
+  renderArrows();
+  renderNotes();
+  resetPanel();
+}
+
+document.getElementById('graph').addEventListener('click', e => {
+  if (e.target === document.getElementById('graph') || e.target.closest('.graph-canvas-wrap') === document.getElementById('graph-canvas-wrap')) {
+    resetPanel();
+  }
+});
+
+/* ═══════════════════════ PANEL TOGGLE ═══════════════════════ */
+function togglePanel() {
+  const panel   = document.getElementById('right-panel');
+  const resizer = document.getElementById('panel-resizer');
+  const btn     = document.getElementById('panel-toggle-btn');
+  const isCollapsed = panel.classList.toggle('collapsed');
+  resizer.classList.toggle('hidden', isCollapsed);
+  btn.textContent = isCollapsed ? '▶' : '◀';
+  localStorage.setItem('arch-panel-collapsed', isCollapsed ? '1' : '');
+}
+
+/* ═══════════════════════ PANEL RESIZE（サイドバー幅） ═══════════════════════ */
+function initPanelResize() {
+  const panel   = document.getElementById('right-panel');
+  const resizer = document.getElementById('panel-resizer');
+  let startX, startWidth;
+
+  const savedW = localStorage.getItem('arch-panel-width');
+  if (savedW) panel.style.width = savedW + 'px';
+
+  resizer.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    if (panel.classList.contains('collapsed')) return;
+    e.preventDefault();
+    resizer.setPointerCapture(e.pointerId);
+    startX     = e.clientX;
+    startWidth = panel.offsetWidth;
+    resizer.classList.add('resizing');
+    document.body.classList.add('is-dragging');
+  });
+
+  resizer.addEventListener('pointermove', e => {
+    if (!resizer.hasPointerCapture(e.pointerId)) return;
+    /* 左に引く → 幅が広がる（右端固定で左に拡大） */
+    const newWidth = Math.max(180, Math.min(600, startWidth + (startX - e.clientX)));
+    panel.style.width = newWidth + 'px';
+  });
+
+  resizer.addEventListener('pointerup', e => {
+    if (!resizer.hasPointerCapture(e.pointerId)) return;
+    resizer.releasePointerCapture(e.pointerId);
+    resizer.classList.remove('resizing');
+    document.body.classList.remove('is-dragging');
+    localStorage.setItem('arch-panel-width', panel.offsetWidth);
+  });
+}
+
+/* ═══════════════════════ NAME EDIT ═══════════════════════ */
+(function initNameEdit() {
+  // 保存済み名前を全スキルに復元
+  Object.keys(SKILLS_DATA).forEach(id => {
+    const saved = localStorage.getItem(`arch-name-${id}`);
+    if (saved) SKILLS_DATA[id].name = saved;
+  });
+
+  const nameEl = document.getElementById('hdr-name');
+  let original = '';
+
+  nameEl.addEventListener('focus', () => {
+    original = nameEl.textContent;
+    // カーソルを末尾へ
+    const range = document.createRange();
+    range.selectNodeContents(nameEl);
+    range.collapse(false);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+
+  nameEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); }
+    if (e.key === 'Escape') { nameEl.textContent = original; nameEl.blur(); }
+    e.stopPropagation(); // ノード操作と干渉しない
+  });
+
+  nameEl.addEventListener('blur', () => {
+    const newName = nameEl.textContent.trim();
+    if (!newName) { nameEl.textContent = original; return; }
+    SKILLS_DATA[currentSkillId].name = newName;
+    localStorage.setItem(`arch-name-${currentSkillId}`, newName);
+    renderTabs();
+  });
+
+  nameEl.addEventListener('pointerdown', e => e.stopPropagation());
+})();
+
+/* ═══════════════════════ CANVAS PAN ═══════════════════════ */
+function initCanvasPan() {
+  const wrap = document.getElementById('graph-wrap');
+  const canvasWrap = document.querySelector('.graph-canvas-wrap');
+  let isPanning = false, startX, startY, startSL, startST, moved;
+
+  wrap.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    const t = e.target;
+    if (t.closest('.node') || t.closest('.sticky-note') ||
+        t.closest('.graph-toolbar') || t.closest('.conn-label-div')) return;
+    isPanning = true;
+    moved = false;
+    startX  = e.clientX; startY  = e.clientY;
+    startSL = wrap.scrollLeft; startST = wrap.scrollTop;
+    wrap.setPointerCapture(e.pointerId);
+    canvasWrap.classList.add('panning');
+    e.preventDefault();
+  });
+
+  wrap.addEventListener('pointermove', e => {
+    if (!isPanning || !wrap.hasPointerCapture(e.pointerId)) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (Math.hypot(dx, dy) > 3) moved = true;
+    wrap.scrollLeft = startSL - dx;
+    wrap.scrollTop  = startST - dy;
+  });
+
+  const endPan = e => {
+    if (!isPanning) return;
+    isPanning = false;
+    if (wrap.hasPointerCapture(e.pointerId)) wrap.releasePointerCapture(e.pointerId);
+    canvasWrap.classList.remove('panning');
+    if (!moved) resetPanel();
+  };
+  wrap.addEventListener('pointerup',     endPan);
+  wrap.addEventListener('pointercancel', endPan);
+}
+
+/* ═══════════════════════ BOOT ═══════════════════════ */
+loadNotes(currentSkillId);
+initPositions(currentSkillId);
+buildNodeMap();
+renderTabs();
+updateHeader();
+renderNodes();
+renderArrows();
+renderFlows();
+renderNotes();
+initPanelResize();
+initCanvasPan();
+if (localStorage.getItem('arch-panel-collapsed') === '1') togglePanel();
+if (!localStorage.getItem(`arch-pos-${currentSkillId}`)) autoLayout();
+</script>
+</body>
