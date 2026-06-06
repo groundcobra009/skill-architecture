@@ -16,7 +16,7 @@ export default async function Home() {
           <h1>{isWorkOSConfigured() ? "ログインしてください" : "WorkOS の設定待ちです"}</h1>
           <p>
             {isWorkOSConfigured()
-              ? "WorkOS AuthKit の Google ログインでワークスペースに入ります。"
+              ? "WorkOS AuthKit のメールアドレス/パスワードまたは有効化済みログイン方法でワークスペースに入ります。"
               : "WORKOS_API_KEY、WORKOS_CLIENT_ID、WORKOS_COOKIE_PASSWORD、NEXT_PUBLIC_WORKOS_REDIRECT_URI を Vercel に設定してください。"}
           </p>
           {isWorkOSConfigured() ? (
