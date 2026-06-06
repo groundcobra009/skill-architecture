@@ -14,6 +14,7 @@ export function isWorkOSConfigured() {
 
 export async function getCurrentUser(): Promise<AppUser | null> {
   if (!isWorkOSConfigured()) {
+    if (process.env.VERCEL_ENV === "production") return null;
     return {
       email: "demo-admin@local.test",
       name: "Demo Admin",

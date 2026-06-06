@@ -3,6 +3,8 @@ node_modules
 .next
 .vercel
 .env
+.env.production
+.env.production.*
 .env*.local
 !.env.example
 convex/_generated

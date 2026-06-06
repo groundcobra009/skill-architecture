@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { getCurrentUser, isAdmin, isWorkOSConfigured } from "../lib/auth";
 import AdminDashboard from "../../components/admin-dashboard";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (isWorkOSConfigured() && !user) redirect("/login");
