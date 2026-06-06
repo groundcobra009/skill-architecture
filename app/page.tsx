@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { LayoutDashboard, LogIn } from "lucide-react";
-import { getAuthLinks, getCurrentUser, isAdmin, isWorkOSConfigured } from "./lib/auth";
+import { getCurrentUser, isAdmin, isWorkOSConfigured } from "./lib/auth";
 import Workbench from "../components/workbench";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const user = await getCurrentUser();
-  const links = await getAuthLinks();
 
   if (!user) {
     return (
@@ -22,7 +21,7 @@ export default async function Home() {
           </p>
           {isWorkOSConfigured() ? (
             <div className="login-actions">
-              <Link className="primary-link" href={links.signIn}>
+              <Link className="primary-link" href="/login">
                 <LogIn size={18} />
                 ログイン
               </Link>
