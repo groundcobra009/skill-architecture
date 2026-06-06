@@ -26,9 +26,6 @@ export default async function Home() {
                 <LogIn size={18} />
                 ログイン
               </Link>
-              <Link className="secondary-link" href={links.signUp}>
-                新規登録
-              </Link>
             </div>
           ) : null}
         </section>

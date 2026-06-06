@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSignInUrl, getSignUpUrl, withAuth } from "@workos-inc/authkit-nextjs";
+import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
 import type { AppUser } from "./types";
 
 export function isWorkOSConfigured() {
@@ -36,11 +36,10 @@ export async function getCurrentUser(): Promise<AppUser | null> {
 
 export async function getAuthLinks() {
   if (!isWorkOSConfigured()) {
-    return { signIn: "/login", signUp: "/login" };
+    return { signIn: "/login" };
   }
   return {
     signIn: await getSignInUrl(),
-    signUp: await getSignUpUrl(),
   };
 }
 
