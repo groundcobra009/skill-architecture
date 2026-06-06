@@ -1,0 +1,31 @@
+{
+  "name": "skill-architecture-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'npm run build'"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "@workos-inc/authkit-nextjs": "^4.1.0",
+    "@xyflow/react": "^12.9.3",
+    "convex": "^1.40.0",
+    "lucide-react": "^0.555.0",
+    "next": "^16.2.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.2",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}

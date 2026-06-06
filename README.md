@@ -1,4 +1,74 @@
-# skill-architecture
+# skill-architecture app
+
+スキルフォルダの中身を**インタラクティブなアーキテクチャ図**として保存・閲覧する Web アプリです。元リポジトリの `template.html` と `SKILL.md` の思想を、Next.js + Convex + WorkOS AuthKit + Vercel で運用できる形にしました。
+
+## 構成
+
+| 領域 | 技術 |
+|------|------|
+| Web | Next.js / React Flow |
+| DB | Convex |
+| 認証 | WorkOS AuthKit（Google ログインは WorkOS 側で有効化） |
+| 管理画面 | `/admin` |
+| AI 生成 | Anthropic API（`ANTHROPIC_MODEL` で差し替え） |
+| デプロイ | Vercel |
+
+## ローカル起動
+
+```bash
+npm install
+npx convex dev --once
+npm run dev
+```
+
+WorkOS の環境変数が未設定の場合は、ローカル確認用の demo admin で起動します。
+
+## 環境変数
+
+`.env.example` を参考に設定します。
+
+```bash
+NEXT_PUBLIC_CONVEX_URL=
+CONVEX_DEPLOYMENT=
+APP_INTERNAL_SECRET=
+
+WORKOS_API_KEY=
+WORKOS_CLIENT_ID=
+WORKOS_COOKIE_PASSWORD=
+NEXT_PUBLIC_WORKOS_REDIRECT_URI=http://localhost:3000/callback
+ADMIN_EMAILS=
+
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+```
+
+本番では WorkOS Dashboard で Google ログインを有効化し、Redirect URI に `https://<your-domain>/callback` を登録します。
+
+## Vercel
+
+Convex の Production Deploy Key を Vercel の `CONVEX_DEPLOY_KEY` に入れて、Build Command は次を使います。
+
+```bash
+npm run convex:deploy
+```
+
+Vercel CLI で入れる場合:
+
+```bash
+npx vercel env add CONVEX_DEPLOY_KEY production
+npx vercel env add APP_INTERNAL_SECRET production
+npx vercel env add WORKOS_API_KEY production
+npx vercel env add WORKOS_CLIENT_ID production
+npx vercel env add WORKOS_COOKIE_PASSWORD production
+npx vercel env add NEXT_PUBLIC_WORKOS_REDIRECT_URI production
+npx vercel env add ADMIN_EMAILS production
+npx vercel env add ANTHROPIC_API_KEY production
+npx vercel env add ANTHROPIC_MODEL production
+```
+
+---
+
+## 元の skill-architecture 仕様
 
 スキルフォルダの中身を**インタラクティブなアーキテクチャ図（HTML）**に変換するスキル。
 
