@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
+import { getSignInUrl, refreshSession } from "@workos-inc/authkit-nextjs";
 import type { AppUser } from "./types";
 
 export function isWorkOSConfigured() {
@@ -23,7 +23,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     };
   }
 
-  const { user } = await withAuth();
+  const { user } = await refreshSession();
   if (!user?.email) return null;
 
   return {
