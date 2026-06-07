@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Skill Architecture",
   description: "Skill folders to interactive architecture maps.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

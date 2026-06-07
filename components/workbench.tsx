@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { strFromU8, unzipSync } from "fflate";
 import {
   Background,
   Controls,
@@ -12,6 +13,7 @@ import {
   type OnNodeDrag,
 } from "@xyflow/react";
 import {
+  FileArchive,
   FilePlus2,
   Loader2,
   Save,
@@ -40,6 +42,86 @@ const catLabel: Record<string, string> = {
   config: "設定",
   output: "出力",
 };
+
+const zipTextExtensions = new Set([
+  ".md",
+  ".mdx",
+  ".txt",
+  ".json",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".py",
+  ".sh",
+  ".html",
+  ".css",
+]);
+
+const ignoredZipParts = [
+  "__macosx/",
+  "node_modules/",
+  ".git/",
+  ".next/",
+  "dist/",
+  "build/",
+  "coverage/",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+];
+
+function isReadableZipEntry(path: string) {
+  const lower = path.toLowerCase();
+  if (lower.endsWith("/")) return false;
+  if (ignoredZipParts.some((part) => lower.includes(part))) return false;
+  return Array.from(zipTextExtensions).some((extension) => lower.endsWith(extension));
+}
+
+function scoreZipEntry(path: string) {
+  const lower = path.toLowerCase();
+  if (lower.endsWith("/skill.md") || lower === "skill.md") return 0;
+  if (lower.endsWith("/readme.md") || lower === "readme.md") return 1;
+  if (lower.endsWith("/agents.md") || lower.endsWith("/claude.md")) return 2;
+  if (lower.includes("/workflows/")) return 3;
+  if (lower.includes("/commands/")) return 4;
+  if (lower.includes("/scripts/")) return 6;
+  return 5;
+}
+
+async function readSkillZip(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const entries = unzipSync(bytes);
+  const files = Object.entries(entries)
+    .filter(([path]) => isReadableZipEntry(path))
+    .sort(([a], [b]) => scoreZipEntry(a) - scoreZipEntry(b) || a.localeCompare(b))
+    .slice(0, 24);
+
+  if (files.length === 0) {
+    throw new Error("zip 内に読み取れるテキストファイルがありませんでした。");
+  }
+
+  let total = 0;
+  const sections: string[] = [];
+  for (const [path, data] of files) {
+    const text = strFromU8(data).replace(/\r\n/g, "\n").trim();
+    if (!text) continue;
+    const budget = scoreZipEntry(path) <= 2 ? 5000 : 1800;
+    const excerpt = text.slice(0, budget);
+    total += excerpt.length;
+    sections.push(`--- ${path} ---\n${excerpt}`);
+    if (total > 21000) break;
+  }
+
+  return {
+    sourceName: file.name.replace(/\.zip$/i, ""),
+    content: sections.join("\n\n").slice(0, 23500),
+    count: files.length,
+  };
+}
 
 function toFlowNodes(diagram: Diagram, activeFlow: SkillFlow | null): Node[] {
   const highlighted = new Set(activeFlow?.nodes ?? []);
@@ -107,6 +189,7 @@ function blankDiagram(): Diagram {
 }
 
 export default function Workbench() {
+  const zipInputRef = useRef<HTMLInputElement | null>(null);
   const [diagrams, setDiagrams] = useState<Diagram[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -199,6 +282,24 @@ export default function Workbench() {
     setSaving(false);
   };
 
+  const importZip = async (file: File | undefined) => {
+    if (!file) return;
+    setSaving(true);
+    setStatus("");
+    try {
+      const result = await readSkillZip(file);
+      setAiSourceName(result.sourceName);
+      setAiContent(result.content);
+      setAiOpen(true);
+      setStatus(`${file.name} から ${result.count} 件のテキストファイルを読み込みました。`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "zip の読み込みに失敗しました。");
+    } finally {
+      setSaving(false);
+      if (zipInputRef.current) zipInputRef.current.value = "";
+    }
+  };
+
   const addDraft = () => {
     setDiagrams((current) => [blankDiagram(), ...current]);
     setActiveIndex(0);
@@ -210,9 +311,20 @@ export default function Workbench() {
     <section className="workspace">
       <aside className="left-rail">
         <div className="rail-actions">
+          <input
+            ref={zipInputRef}
+            className="file-input"
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            onChange={(event) => void importZip(event.currentTarget.files?.[0])}
+          />
           <button className="primary-button" onClick={addDraft}>
             <FilePlus2 size={16} />
             新規
+          </button>
+          <button className="ghost-button" onClick={() => zipInputRef.current?.click()} disabled={saving}>
+            <FileArchive size={16} />
+            ZIP
           </button>
           <button className="ghost-button" onClick={() => setAiOpen((value) => !value)}>
             <WandSparkles size={16} />
@@ -275,7 +387,7 @@ export default function Workbench() {
               <textarea
                 value={aiContent}
                 onChange={(event) => setAiContent(event.target.value)}
-                placeholder="SKILL.md や README の内容を貼り付け"
+                placeholder="SKILL.md や README の内容を貼り付け、または左の ZIP から読み込み"
               />
             </div>
             <button className="primary-button" onClick={generate} disabled={saving || aiContent.length < 80}>

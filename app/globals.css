@@ -73,6 +73,10 @@ button {
   flex-wrap: wrap;
 }
 
+.file-input {
+  display: none;
+}
+
 .user-pill,
 .icon-link,
 .primary-link,

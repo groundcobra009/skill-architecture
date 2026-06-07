@@ -16,6 +16,7 @@
     "@workos-inc/authkit-nextjs": "^4.1.0",
     "@xyflow/react": "^12.9.3",
     "convex": "^1.40.0",
+    "fflate": "^0.8.3",
     "lucide-react": "^0.555.0",
     "next": "^16.2.7",
     "react": "^19.2.1",
