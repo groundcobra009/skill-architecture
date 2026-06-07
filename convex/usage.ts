@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
-import { assertInternalSecret } from "./lib";
+import { assertInternalSecret, roleForEmail } from "./lib";
 
 export const track = mutation({
   args: {
@@ -9,6 +9,7 @@ export const track = mutation({
       email: v.string(),
       name: v.string(),
       workosUserId: v.string(),
+      role: v.optional(v.string()),
     }),
     action: v.string(),
     detail: v.string(),
@@ -26,12 +27,14 @@ export const track = mutation({
       await ctx.db.patch(existing._id, {
         name: args.user.name,
         workosUserId: args.user.workosUserId,
+        role: args.user.role ?? roleForEmail(args.user.email),
         lastSeenAt: now,
         useCount: existing.useCount + 1,
       });
     } else {
       await ctx.db.insert("users", {
         ...args.user,
+        role: args.user.role ?? roleForEmail(args.user.email),
         firstSeenAt: now,
         lastSeenAt: now,
         useCount: 1,
@@ -40,6 +43,7 @@ export const track = mutation({
 
     await ctx.db.insert("usageEvents", {
       ...args.user,
+      role: args.user.role ?? roleForEmail(args.user.email),
       action: args.action,
       detail: args.detail,
       at: now,

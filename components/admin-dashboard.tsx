@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
 type Overview = {
-  totals: { users: number; events: number; diagrams: number };
-  users: Array<{ _id: string; email: string; name: string; lastSeenAt: number; useCount: number }>;
-  events: Array<{ _id: string; email: string; name: string; action: string; detail: string; at: number }>;
+  totals: { users: number; admins: number; events: number; diagrams: number };
+  users: Array<{ _id: string; email: string; name: string; role: string; lastSeenAt: number; useCount: number }>;
+  events: Array<{ _id: string; email: string; name: string; role: string; action: string; detail: string; at: number }>;
   diagrams: Array<{ _id: string; title: string; sourceName: string; ownerEmail: string; updatedAt: number }>;
 };
 
@@ -52,6 +52,10 @@ export default function AdminDashboard() {
           <strong>{overview?.totals.users ?? 0}</strong>
         </div>
         <div className="metric">
+          <span>管理者</span>
+          <strong>{overview?.totals.admins ?? 0}</strong>
+        </div>
+        <div className="metric">
           <span>利用イベント</span>
           <strong>{overview?.totals.events ?? 0}</strong>
         </div>
@@ -73,6 +77,7 @@ export default function AdminDashboard() {
           <thead>
             <tr>
               <th>ユーザー</th>
+              <th>権限</th>
               <th>回数</th>
               <th>最終利用</th>
             </tr>
@@ -83,6 +88,9 @@ export default function AdminDashboard() {
                 <td>
                   <strong>{user.name}</strong>
                   <span>{user.email}</span>
+                </td>
+                <td>
+                  <span className={user.role === "admin" ? "role-badge admin" : "role-badge"}>{user.role}</span>
                 </td>
                 <td>{user.useCount}</td>
                 <td>{fmt(user.lastSeenAt)}</td>
@@ -100,7 +108,9 @@ export default function AdminDashboard() {
               <tr key={event._id}>
                 <td>
                   <strong>{event.action}</strong>
-                  <span>{event.email}</span>
+                  <span>
+                    {event.email} / {event.role}
+                  </span>
                 </td>
                 <td>{event.detail}</td>
                 <td>{fmt(event.at)}</td>

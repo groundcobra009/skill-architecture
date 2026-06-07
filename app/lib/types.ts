@@ -49,4 +49,5 @@ export type AppUser = {
   name: string;
   workosUserId: string;
   isDemo: boolean;
+  role: "admin" | "member";
 };

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { assertInternalSecret } from "./lib";
+import { assertInternalSecret, roleForEmail } from "./lib";
 
 const graphNode = v.object({
   id: v.string(),
@@ -39,12 +39,14 @@ const userArgs = {
   email: v.string(),
   name: v.string(),
   workosUserId: v.string(),
+  role: v.optional(v.string()),
 };
 
 type AppUser = {
   email: string;
   name: string;
   workosUserId: string;
+  role?: string;
 };
 
 async function touchUser(ctx: any, user: AppUser) {
@@ -58,6 +60,7 @@ async function touchUser(ctx: any, user: AppUser) {
     await ctx.db.patch(existing._id, {
       name: user.name,
       workosUserId: user.workosUserId,
+      role: user.role ?? roleForEmail(user.email),
       lastSeenAt: now,
       useCount: existing.useCount + 1,
     });
@@ -66,6 +69,7 @@ async function touchUser(ctx: any, user: AppUser) {
 
   await ctx.db.insert("users", {
     ...user,
+    role: user.role ?? roleForEmail(user.email),
     firstSeenAt: now,
     lastSeenAt: now,
     useCount: 1,

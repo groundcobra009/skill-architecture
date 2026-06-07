@@ -53,6 +53,7 @@ function convexUser(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>
     email: user.email,
     name: user.name,
     workosUserId: user.workosUserId,
+    role: user.role,
   };
 }
 

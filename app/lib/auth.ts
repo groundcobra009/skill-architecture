@@ -3,6 +3,21 @@ import "server-only";
 import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
 import type { AppUser } from "./types";
 
+const defaultAdminEmails = ["nakashima.keitarou@gmail.com"];
+
+function adminEmails() {
+  const configured = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  return Array.from(new Set([...defaultAdminEmails, ...configured]));
+}
+
+function roleForEmail(email: string): AppUser["role"] {
+  return adminEmails().includes(email.toLowerCase()) ? "admin" : "member";
+}
+
 export function isWorkOSConfigured() {
   return Boolean(
     process.env.WORKOS_API_KEY &&
@@ -20,17 +35,21 @@ export async function getCurrentUser(): Promise<AppUser | null> {
       name: "Demo Admin",
       workosUserId: "local-demo-user",
       isDemo: true,
+      role: "admin",
     };
   }
 
   const { user } = await withAuth();
   if (!user?.email) return null;
 
+  const email = user.email.toLowerCase();
+
   return {
-    email: user.email,
-    name: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email,
+    email,
+    name: [user.firstName, user.lastName].filter(Boolean).join(" ") || email,
     workosUserId: user.id,
     isDemo: false,
+    role: roleForEmail(email),
   };
 }
 
@@ -45,11 +64,5 @@ export async function getAuthLinks() {
 
 export function isAdmin(user: AppUser | null) {
   if (!user) return false;
-  const admins = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (user.isDemo && admins.length === 0) return true;
-  return admins.includes(user.email.toLowerCase());
+  return user.role === "admin";
 }
